@@ -5,9 +5,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 import time
-
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
+import csv
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
 driver.get("https://www.allproductkorea.or.kr/products/database/category")
@@ -102,8 +100,6 @@ for i1 in range(min(2, len(depth_1_items))):
 # 결과 출력
 for row in result:
     print(f"대분류: {row[0]}, 중분류: {row[1]}, 소분류: {row[2]}, 세분류: {row[3]}, 예시: {row[4]}")
-
-import csv
 
 csv_filename = "product_categories.csv"
 final_result = []
