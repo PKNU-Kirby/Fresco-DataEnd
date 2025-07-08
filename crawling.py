@@ -1,3 +1,5 @@
+# 유통상품 표준DB 상품분류 소개 크롤링
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
@@ -8,6 +10,7 @@ import time
 import csv
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+# URL 주소: https://www.allproductkorea.or.kr/products/database/category
 driver.get("https://www.allproductkorea.or.kr/products/database/category")
 wait = WebDriverWait(driver, 20)
 
