@@ -10,8 +10,8 @@ import time
 import csv
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
-# URL 주소: https://www.allproductkorea.or.kr/products/database/category
-driver.get("https://www.allproductkorea.or.kr/products/database/category")
+url = "https://www.allproductkorea.or.kr/products/database/category"
+driver.get(url)
 wait = WebDriverWait(driver, 20)
 
 result = []
