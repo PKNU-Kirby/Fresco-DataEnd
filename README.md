@@ -13,15 +13,13 @@
 - 예시 항목이 여러 개인 경우 개별 레코드로 분리 저장
 
 ## 2. FastAPI Product Search API
-
 제품명 검색 및 매핑용 API 입니다.
 
 ### Features
-
 - ElasticSearch를 활용한 긴 재료명을 리스트의 상품명으로 매핑
 - 매핑된 상품명에 해당하는 카테고리 매핑
 
-## Structure
+### Structure
 ```bash
 dataend/
 ├── .env
@@ -32,7 +30,6 @@ dataend/
 │   ├── main.py
 │   ├── bulk_index.py
 |   └── requirements.txt
-
 ```
 
 ### API Endpoints
