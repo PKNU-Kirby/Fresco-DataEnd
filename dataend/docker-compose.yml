@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+    container_name: es
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+
+  fastapi:
+    build: .
+    depends_on:
+      - elasticsearch
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "sleep 20 && python bulk_index.py && uvicorn main:app --host 0.0.0.0 --port 8000"
+
+volumes:
+  esdata:
