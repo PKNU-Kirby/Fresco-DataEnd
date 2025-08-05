@@ -20,6 +20,8 @@ services:
 
   fastapi:
     build: .
+    env_file:
+      - .env
     depends_on:
       - elasticsearch
     ports:

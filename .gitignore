@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -192,3 +193,7 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+=======
+.env
+__pycache__
+>>>>>>> 49194b6 (전반적인 파일 수정)
