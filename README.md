@@ -23,6 +23,7 @@
 ```bash
 dataend/
 ├── .env
+├── .dockerignore
 ├── docker-compose.yml
 ├── Dockerfile
 ├── product_name_categories.csv
