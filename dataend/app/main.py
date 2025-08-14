@@ -19,7 +19,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 def root():
     return "FastAPI Is Running!"
 
-@app.get("/search/")
+@app.get("/search")
 def search_products(ingredient_names: list[str] = Query(...)):
     results = []
     for name in ingredient_names:
@@ -62,7 +62,7 @@ def search_products(ingredient_names: list[str] = Query(...)):
 
     return results
 
-@app.post("/detect/")
+@app.post("/detect")
 async def detect_ingredients(image: UploadFile = File(...)):
     image_bytes = await image.read()
     
