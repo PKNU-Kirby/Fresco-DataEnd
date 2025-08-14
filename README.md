@@ -43,4 +43,4 @@ dataend/
 | POST    | `/detect `                      | 이미지 인식을 통해 이미지 속 식재료 확인         |
 
 ### URL
-API 바로가기[https://data.fresco.kro.kr]
+[API 바로가기](https://data.fresco.kro.kr)
