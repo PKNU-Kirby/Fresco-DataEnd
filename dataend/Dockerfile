@@ -1,13 +1,16 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
-WORKDIR /app
+WORKDIR /dataend
 
-COPY app/requirements.txt .
+COPY requirements.txt /dataend/
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app .
+COPY app ./app
+COPY services ./services
+COPY scripts ./scripts
+COPY data ./data
 
-COPY product_name_categories.csv /data/product_name_categories.csv
+ENV PYTHONPATH=/dataend/app
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
