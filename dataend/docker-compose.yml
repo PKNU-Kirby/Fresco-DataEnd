@@ -33,7 +33,7 @@ services:
     ports:
       - "8000:8000"
     command: >
-      sh -c "python scripts/bulk_index.py && uvicorn main:app --host 0.0.0.0 --port 8000"
+      sh -c "python scripts/sync_to_es.py && uvicorn main:app --host 0.0.0.0 --port 8000"
 
 volumes:
   esdata:

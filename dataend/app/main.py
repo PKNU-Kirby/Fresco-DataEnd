@@ -12,7 +12,7 @@ app = FastAPI()
 def root():
     return "FastAPI Is Running!"
 
-@app.get("/search/")
+@app.get("/search")
 async def search_products(ingredient_names: list[str] = Query(...)):
     
     es_tasks = [search_es(name, "products") for name in ingredient_names]
@@ -28,7 +28,7 @@ async def search_products(ingredient_names: list[str] = Query(...)):
     
     return final_results
 
-@app.post("/detect/")
+@app.post("/detect")
 async def detect_ingredients(image: UploadFile = File(...)):
     image_bytes = await image.read()
     

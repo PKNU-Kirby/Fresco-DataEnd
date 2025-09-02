@@ -1,16 +1,38 @@
 from openai import OpenAI
 from elasticsearch import AsyncElasticsearch
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
 
 import pandas as pd
 import os
 import json
 import asyncio
 
-es = AsyncElasticsearch(hosts=["http://elasticsearch:9200"])
-df = pd.read_csv("data/product_name_categories.csv")
-candidate_names = df["ingredientName"].drop_duplicates().tolist()
-system_prompt = f"후보 식재료 리스트:\n{candidate_names}"
+load_dotenv()
+
+engine = create_engine(
+    f"mysql+pymysql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}"
+    f"@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
+)
+
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+es = AsyncElasticsearch("http://elasticsearch:9200")
+
+query = """
+        SELECT i.id as ingredientId,
+            i.name as ingredientName,
+            i.updatedAt,
+            c.id as categoryId,
+            c.name as categoryName
+        FROM ingredients i
+        JOIN categories c ON i.categoryId = c.id
+    """
+
+df = pd.read_sql(query, engine)
+
+candidate_names = df["ingredientName"].drop_duplicates().tolist()
+
+system_prompt = f"후보 식재료 리스트:\n{candidate_names}"
 
 async def search_es(name, index_name):
     query = {
@@ -50,7 +72,7 @@ async def ask_openai_for_remap(input_name: str, es_result: str) -> dict:
     try:
         response = await asyncio.to_thread(
             lambda: client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4.1-nano",
                 messages=[{"role": "system", "content": system_prompt}, 
                           {"role": "user", "content": user_prompt}
                           ],
@@ -90,7 +112,7 @@ async def ask_openai_for_remap(input_name: str, es_result: str) -> dict:
             }
 
     except Exception as e:
-        print(f"[WARN] OpenAI remap failed for {input_name}: {e}")
+        print(f"OpenAI remap failed for {input_name}: {e}")
 
     return {
         "input_name": input_name,
