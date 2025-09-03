@@ -1,0 +1,1 @@
+from .ingredient_repo import get_all_ingredients

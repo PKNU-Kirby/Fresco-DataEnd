@@ -1,15 +1,15 @@
 from elasticsearch import Elasticsearch
 from datetime import datetime, timezone
 from elasticsearch.helpers import bulk
-from dotenv import load_dotenv
 from pymysql.cursors import DictCursor
 
 import os
 import pymysql
+import json
 
 INDEX_NAME = "products"
 
-es = Elasticsearch("http://localhost:9200").options(request_timeout=60)
+es = Elasticsearch("http://elasticsearch:9200").options(request_timeout=60)
 
 mapping = {
     "settings": {
@@ -83,21 +83,17 @@ def create_index_if_not_exists():
         return True  # 새로 생성
 
 def sync_to_es():
-    # Elasticsearch 연결 확인
     if not es.ping():
-        print("Elasticsearch 연결 실패")
+        print("[ERROR] Elasticsearch 연결 실패")
         return
 
-    # 인덱스 존재 여부 확인 및 생성
-    is_new_index = create_index_if_not_exists()
+    create_index_if_not_exists()
 
-    # 동기화 전 문서 수
-    count_before = es.count(index=INDEX_NAME)['count'] if not is_new_index else 0
-    print(f"동기화 전 문서 수: {count_before}")
+    count_before = es.count(index=INDEX_NAME)["count"]
+    print(f"[INFO] 동기화 전 문서 수: {count_before}")
 
     # MySQL 연결
     try:
-        load_dotenv()
         conn = pymysql.connect(
             host=os.getenv("DB_HOST"),
             user=os.getenv("DB_USER"),
@@ -106,76 +102,95 @@ def sync_to_es():
             port=int(os.getenv("DB_PORT")),
             cursorclass=DictCursor
         )
-        print("MySQL 연결 성공")
+        print("[INFO] MySQL 연결 성공")
     except Exception as e:
-        print("MySQL 연결 실패:", e)
+        print("[ERROR] MySQL 연결 실패:", e)
         return
 
     cursor = conn.cursor()
 
-    # 마지막 동기화 시각 읽기
-    try:
-        with open("../data/last_sync.txt", "r") as f:
-            last_sync = f.read() or "1970-01-01 00:00:00"
-    except FileNotFoundError:
-        last_sync = "1970-01-01 00:00:00"
-
-    # MySQL 데이터 가져오기 (증분 반영)
+    # MySQL 전체 데이터 조회
     query = """
         SELECT i.id as ingredientId,
-            i.name as ingredientName,
-            i.updatedAt,
-            c.id as categoryId,
-            c.name as categoryName
+               i.name as ingredientName,
+               i.updatedAt,
+               c.id as categoryId,
+               c.name as categoryName
         FROM ingredients i
         JOIN categories c ON i.categoryId = c.id
-        WHERE i.updatedAt > %s
     """
-    cursor.execute(query, (last_sync,))
+    cursor.execute(query)
     rows = cursor.fetchall()
+    print(f"[INFO] MySQL에서 가져온 전체 데이터 수: {len(rows)}")
 
-    print(f"MySQL에서 가져온 데이터 수: {len(rows)}")
+    # ES에 존재하는 문서 조회
+    resp = es.search(index=INDEX_NAME, size=2000, body={"query": {"match_all": {}}})
+    existing_docs = {doc["_id"]: doc["_source"] for doc in resp["hits"]["hits"]}
 
-    # Elasticsearch bulk 색인
-    actions = [
-        {
-            "_index": INDEX_NAME,
-            "_id": row["ingredientId"],
-            "_source": {
-                "ingredientId": row["ingredientId"],
-                "ingredientName": row["ingredientName"],
-                "ingredientName_nospace": row["ingredientName"].replace(" ", ""),
-                "categoryName": row["categoryName"],
-                "categoryId": row["categoryId"],
-                "updatedAt": row["updatedAt"]
-            }
+    mysql_ids = set()
+    actions = []
+
+    # 신규/변경/삭제 카운트
+    new_count = 0
+    update_count = 0
+
+    # 1. 신규/변경 문서 처리
+    for row in rows:
+        doc_id = str(row["ingredientId"])
+        mysql_ids.add(doc_id)
+
+        source = {
+            "ingredientId": row["ingredientId"],
+            "ingredientName": row["ingredientName"],
+            "ingredientName_nospace": row["ingredientName"].replace(" ", ""),
+            "categoryName": row["categoryName"],
+            "categoryId": row["categoryId"],
+            "updatedAt": row["updatedAt"].strftime("%Y-%m-%dT%H:%M:%S") if hasattr(row["updatedAt"], "strftime") else row["updatedAt"]
         }
-        for row in rows
-    ]
 
+        if doc_id not in existing_docs:
+            # 신규 문서
+            actions.append({"_index": INDEX_NAME, "_id": doc_id, "_source": source})
+            new_count += 1
+            print(f"[NEW] ID: {doc_id}, 내용: {source}")
+        else:
+            # 변경 여부 확인 (변경된 컬럼만 표시)
+            old = existing_docs[doc_id]
+            differences = {}
+            for key in source:
+                if source[key] != old.get(key):
+                    differences[key] = {"이전": old.get(key), "이후": source[key]}
+
+            if differences:
+                actions.append({"_index": INDEX_NAME, "_id": doc_id, "_source": source})
+                update_count += 1
+                print(f"[UPDATE] ID: {doc_id}")
+                for k, v in differences.items():
+                    print(f" - {k}: [이전] {v['이전']} → [이후] {v['이후']}")
+
+    # 2. ES에만 존재하는 문서 삭제
+    to_delete = set(existing_docs.keys()) - mysql_ids
+    delete_count = len(to_delete)
+    for doc_id in to_delete:
+        doc = existing_docs[doc_id]
+        print(f"[DELETE] ID: {doc_id}, 내용: {doc}")
+        es.options(ignore_status=[404]).delete(index=INDEX_NAME, id=doc_id)
+
+    # 3. Bulk 색인
     if actions:
-        try:
-            bulk(es, actions)
-            es.indices.refresh(index=INDEX_NAME)
-            print(f"Elasticsearch 색인 완료: {len(actions)}건")
-        except Exception as e:
-            print("Elasticsearch 색인 실패:", e)
+        success, _ = bulk(es, actions)
     else:
-        print("새로 색인할 데이터 없음")
+        success = 0
 
-    # 마지막 동기화 시각 기록
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    with open("../data/last_sync.txt", "w") as f:
-        f.write(now)
+    # 4. 요약 출력
+    print(f"[INFO] 색인/갱신 완료: {success}건 (신규: {new_count}, 변경: {update_count}, 삭제: {delete_count})")
 
+    es.indices.refresh(index=INDEX_NAME)
     conn.close()
-    print("MySQL 연결 종료")
+    print("[INFO] MySQL 연결 종료")
 
-    # 동기화 후 문서 수
-    count_after = es.count(index=INDEX_NAME)['count']
-    print(f"동기화 후 문서 수: {count_after}")
-    print(f"이번 동기화로 추가/업데이트된 문서 수: {count_after - count_before}")
-
+    count_after = es.count(index=INDEX_NAME)["count"]
+    print(f"[INFO] 동기화 후 문서 수: {count_after}")
 
 if __name__ == "__main__":
     sync_to_es()

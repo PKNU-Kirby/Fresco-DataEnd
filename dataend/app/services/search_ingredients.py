@@ -1,40 +1,31 @@
 from openai import OpenAI
 from elasticsearch import AsyncElasticsearch
-from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from repositories import get_all_ingredients
 
-import pandas as pd
 import os
 import json
 import asyncio
-
-load_dotenv()
-
-engine = create_engine(
-    f"mysql+pymysql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}"
-    f"@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
-)
+import threading
+import time
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 es = AsyncElasticsearch("http://elasticsearch:9200")
+df = get_all_ingredients()
 
-query = """
-        SELECT i.id as ingredientId,
-            i.name as ingredientName,
-            i.updatedAt,
-            c.id as categoryId,
-            c.name as categoryName
-        FROM ingredients i
-        JOIN categories c ON i.categoryId = c.id
-    """
+def refresh_df_periodically(interval_seconds=60):
+    global df
+    while True:
+        try:
+            df = get_all_ingredients()
+            print(f"df refreshed at {time.strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+        except Exception as e:
+            print(f"Failed to refresh df: {e}", flush=True)
+        time.sleep(interval_seconds)
 
-df = pd.read_sql(query, engine)
-
-candidate_names = df["ingredientName"].drop_duplicates().tolist()
-
-system_prompt = f"후보 식재료 리스트:\n{candidate_names}"
+threading.Thread(target=refresh_df_periodically, args=(60,), daemon=True).start()
 
 async def search_es(name, index_name):
+    
     query = {
             "query": {
                     "bool": {
@@ -61,6 +52,10 @@ async def remap_wrapper(name, top_name):
 
 
 async def ask_openai_for_remap(input_name: str, es_result: str) -> dict:
+    global df
+    candidate_names = df["ingredientName"].drop_duplicates().tolist()
+    system_prompt = f"후보 식재료 리스트:\n{candidate_names}"
+    
     user_prompt = (
         f"사용자 입력: {input_name}\n"
         f"Elasticsearch 결과: {es_result}\n\n"

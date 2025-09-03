@@ -1,10 +1,7 @@
 from fastapi import FastAPI, Query, File, UploadFile
-from services import search_es, remap_wrapper, ask_openai_for_remap, ask_openai_for_detect
+from services import search_es, remap_wrapper, ask_openai_for_detect
 
-import pandas as pd
 import asyncio
-
-df = pd.read_csv("data/product_name_categories.csv")
 
 app = FastAPI()
 
@@ -32,6 +29,6 @@ async def search_products(ingredient_names: list[str] = Query(...)):
 async def detect_ingredients(image: UploadFile = File(...)):
     image_bytes = await image.read()
     
-    results = ask_openai_for_detect(image_bytes, df)
+    results = ask_openai_for_detect(image_bytes)
     
     return results

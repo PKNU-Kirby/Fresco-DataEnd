@@ -7,7 +7,7 @@ COPY requirements.txt /dataend/
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
-COPY services ./services
+COPY app/services ./app/services
 COPY scripts ./scripts
 COPY data ./data
 

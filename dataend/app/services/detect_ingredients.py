@@ -1,15 +1,31 @@
 from openai import OpenAI
+from repositories import get_all_ingredients
 
 import json
-import pandas as pd
 import os
 import base64
+import threading
+import time
 
 INDEX_NAME = "products"
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+df = get_all_ingredients()
 
-def ask_openai_for_detect(image_bytes: bytes, df: pd.DataFrame) -> list[dict]:
+def refresh_df_periodically(interval_seconds=60):
+    global df
+    while True:
+        try:
+            df = get_all_ingredients()
+            print(f"df refreshed at {time.strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+        except Exception as e:
+            print(f"Failed to refresh df: {e}",  flush=True)
+        time.sleep(interval_seconds)
+
+threading.Thread(target=refresh_df_periodically, args=(60,), daemon=True).start()
+
+def ask_openai_for_detect(image_bytes: bytes) -> list[dict]:
+    global df   
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
     candidate_names = df["ingredientName"].drop_duplicates().tolist()
     candidates_str = ", ".join(candidate_names)
