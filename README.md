@@ -22,17 +22,22 @@ Elasticsearch 기반의 유사도 검색과 AI 모델을 활용한 이미지 분
 
 ### Structure
 ```bash
-dataend/
-├── .env
-├── .dockerignore
-├── docker-compose.yml
+dataend
 ├── Dockerfile
-├── product_name_categories.csv
-├── app/
+├── app
+│   ├── db.py
 │   ├── main.py
-│   ├── bulk_index.py
-│   ├── services.py
-|   └── requirements.txt
+│   ├── repositories
+│   │   ├── __init__.py
+│   │   └── ingredient_repo.py
+│   └── services
+│       ├── __init__.py
+│       ├── detect_ingredients.py
+│       └── search_ingredients.py
+├── docker-compose.yml
+├── requirements.txt
+└── scripts
+    └── sync_to_es.py
 ```
 
 ### API Endpoints
